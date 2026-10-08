@@ -1,0 +1,63 @@
+name: biba
+
+services:
+  web:
+    image: nginx:1.30-alpine
+    ports:
+      - "${WEB_PORT}:80"
+    depends_on:
+      app:
+        condition: service_started
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - front
+
+  app:
+    build: .
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    networks:
+      - front
+      - back
+
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 3s
+    volumes:
+      - aboba:/var/lib/postgresql
+    networks:
+      - back
+
+  cache:
+    image: redis:8.8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    networks:
+      - back
+
+networks:
+  front:
+  back:
+
+volumes:
+  aboba:
